@@ -4,7 +4,17 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import PropertySelector, { type GaPropertyOption } from "@/components/PropertySelector";
-import { api } from "@/lib/api";
+import { api, type ApiFetchError } from "@/lib/api";
+
+function formatApiError(e: unknown, fallback: string): string {
+  if (e instanceof Error && "status" in e) {
+    const err = e as ApiFetchError;
+    if (err.status === 503) {
+      return "Database not configured. Set DATABASE_URL on the backend and restart.";
+    }
+  }
+  return e instanceof Error ? e.message : fallback;
+}
 
 export default function SelectPropertyPage() {
   const router = useRouter();
@@ -31,7 +41,7 @@ export default function SelectPropertyPage() {
       );
       setProperties(data.properties ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load properties");
+      setError(formatApiError(e, "Failed to load properties"));
       setProperties([]);
     } finally {
       setLoading(false);
@@ -62,7 +72,7 @@ export default function SelectPropertyPage() {
       );
       router.push("/dashboard");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(formatApiError(e, "Save failed"));
     } finally {
       setSaving(false);
     }

@@ -6,9 +6,9 @@ import { ensureDbUser } from "../middleware/dbUser.middleware.js";
 const router = Router();
 
 router.use(requireAuth);
-router.use(ensureDbUser);
 
 router.get("/properties", gaController.listProperties);
-router.post("/connections", gaController.saveConnection);
+router.get("/connection", ensureDbUser, gaController.getConnection);
+router.post("/connections", ensureDbUser, gaController.saveConnection);
 
 export default router;

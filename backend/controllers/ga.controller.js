@@ -1,5 +1,9 @@
 import { listGa4PropertiesForPicker } from "../services/ga.service.js";
-import { upsertConnectionForUser } from "../services/connection.service.js";
+import {
+  upsertConnectionForUser,
+  getConnectionByUserId,
+  formatConnectionResponse,
+} from "../services/connection.service.js";
 
 export async function listProperties(req, res, next) {
   try {
@@ -9,6 +13,18 @@ export async function listProperties(req, res, next) {
     }
     const properties = await listGa4PropertiesForPicker(token);
     res.json({ properties });
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function getConnection(req, res, next) {
+  try {
+    const row = await getConnectionByUserId(req.dbUserId);
+    if (!row) {
+      return res.status(404).json({ error: "No GA4 property connected" });
+    }
+    res.json({ connection: formatConnectionResponse(row) });
   } catch (e) {
     next(e);
   }

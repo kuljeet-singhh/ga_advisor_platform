@@ -19,6 +19,7 @@ export function getConnectionString() {
 }
 
 let pool;
+let poolConnectionString;
 
 function getPoolMaxConnections() {
   const raw = process.env.DATABASE_POOL_MAX;
@@ -31,12 +32,18 @@ function getPoolMaxConnections() {
 }
 
 export function getPool() {
-  if (!process.env.DATABASE_URL) {
+  const connectionString = getConnectionString();
+  if (!connectionString) {
     return null;
   }
+  if (pool && poolConnectionString !== connectionString) {
+    pool.end().catch(() => {});
+    pool = null;
+  }
   if (!pool) {
+    poolConnectionString = connectionString;
     pool = new pg.Pool({
-      connectionString: getConnectionString(),
+      connectionString,
       max: getPoolMaxConnections(),
       idleTimeoutMillis: 30_000,
     });

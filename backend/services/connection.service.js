@@ -28,3 +28,33 @@ export async function upsertConnectionForUser({
   );
   return result.rows[0];
 }
+
+export async function getConnectionByUserId(userId) {
+  const result = await query(
+    `SELECT id, user_id, property_id, property_name, access_token_encrypted, refresh_token_encrypted,
+            token_expires_at, connected_at
+     FROM ga_connections WHERE user_id = $1`,
+    [userId]
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function getConnectionByIdForUser(connectionId, userId) {
+  const result = await query(
+    `SELECT id, user_id, property_id, property_name, access_token_encrypted, refresh_token_encrypted,
+            token_expires_at, connected_at
+     FROM ga_connections WHERE id = $1 AND user_id = $2`,
+    [connectionId, userId]
+  );
+  return result.rows[0] ?? null;
+}
+
+export function formatConnectionResponse(row) {
+  return {
+    id: row.id,
+    propertyId: row.property_id,
+    propertyName: row.property_name,
+    tokenExpiresAt: row.token_expires_at,
+    connectedAt: row.connected_at,
+  };
+}
