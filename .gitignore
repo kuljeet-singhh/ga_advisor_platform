@@ -20,6 +20,7 @@ yarn-debug.log*
 # Task specs and task indexes (local only)
 **/tasks/
 **/TASKS.md
+my_task.md
 
 # Cursor rules (local / team IDE only)
 .cursor/rules/
