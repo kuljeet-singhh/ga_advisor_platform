@@ -4,7 +4,11 @@ import {
   getMockRecommendationPayload,
   formatRecommendationResponse,
 } from "../services/recommendation.service.js";
-import { runSyncForConnection } from "../services/analyse.service.js";
+import {
+  runSyncForConnection,
+  runGaSyncForConnection,
+} from "../services/analyse.service.js";
+import { getLatestSnapshotPayloadForUser } from "../services/snapshot.service.js";
 
 export async function latestRecommendations(req, res, next) {
   try {
@@ -19,6 +23,41 @@ export async function latestRecommendations(req, res, next) {
     }
 
     return res.json(getMockRecommendationPayload());
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function latestSnapshot(req, res, next) {
+  try {
+    const payload = await getLatestSnapshotPayloadForUser(req.dbUserId);
+    if (!payload) {
+      const connection = await getConnectionByUserId(req.dbUserId);
+      if (!connection) {
+        return res.status(404).json({ error: "No GA4 property connected" });
+      }
+      return res.status(404).json({ error: "No GA data yet. Fetch GA data first." });
+    }
+    res.json(payload);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function gaSyncConnection(req, res, next) {
+  try {
+    const { connectionId } = req.params;
+    if (!connectionId) {
+      return res.status(400).json({ error: "connectionId is required" });
+    }
+
+    const result = await runGaSyncForConnection({
+      connectionId,
+      userId: req.dbUserId,
+      bearerAccessToken: req.bearerAccessToken,
+    });
+
+    res.status(201).json(result);
   } catch (e) {
     next(e);
   }

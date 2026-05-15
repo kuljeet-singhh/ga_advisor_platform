@@ -3,26 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
-import HealthScore from "@/components/HealthScore";
-import IssueList, { type IssueItem } from "@/components/IssueList";
 import BackendAuthStatus from "@/components/BackendAuthStatus";
+import GaMetricsTable from "@/components/GaMetricsTable";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorMessage from "@/components/ErrorMessage";
 import { api, type ApiFetchError } from "@/lib/api";
-import type {
-  ConnectionResponse,
-  LatestRecommendationsResponse,
-  RecommendationIssue,
-} from "@/types/recommendations";
-
-function mapIssuesToList(issues: RecommendationIssue[]): IssueItem[] {
-  return issues.map((issue) => ({
-    title: issue.page || issue.issue || "Issue",
-    metric: issue.metric,
-    impact: issue.impact,
-    body: issue.recommendation ?? issue.rootCause,
-  }));
-}
+import type { ConnectionResponse } from "@/types/recommendations";
+import type { LatestSnapshotResponse } from "@/types/snapshots";
 
 function DashboardShell({ children }: { children: ReactNode }) {
   return (
@@ -34,18 +21,47 @@ function DashboardShell({ children }: { children: ReactNode }) {
   );
 }
 
+function formatSyncError(message: string): string {
+  if (/401|expired|invalid.*token/i.test(message)) {
+    return `${message} Try signing out and signing in again.`;
+  }
+  return message;
+}
+
 export default function DashboardView() {
   const { data: session, status } = useSession();
   const token = session?.googleAccessToken;
 
   const [connection, setConnection] = useState<ConnectionResponse["connection"] | null>(null);
-  const [recommendations, setRecommendations] = useState<LatestRecommendationsResponse | null>(
-    null
-  );
+  const [snapshot, setSnapshot] = useState<LatestSnapshotResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noConnection, setNoConnection] = useState(false);
+  const [noSnapshot, setNoSnapshot] = useState(false);
+
+  const loadSnapshot = useCallback(
+    async (conn: ConnectionResponse["connection"]) => {
+      try {
+        const snap = await api<LatestSnapshotResponse>(
+          "/snapshots/latest",
+          {},
+          { accessToken: token }
+        );
+        setSnapshot(snap);
+        setNoSnapshot(false);
+      } catch (e) {
+        const err = e as ApiFetchError;
+        if (err.status === 404) {
+          setSnapshot(null);
+          setNoSnapshot(true);
+        } else {
+          throw e;
+        }
+      }
+    },
+    [token]
+  );
 
   const load = useCallback(async () => {
     if (!token) {
@@ -55,48 +71,45 @@ export default function DashboardView() {
     setLoading(true);
     setError(null);
     setNoConnection(false);
+    setNoSnapshot(false);
     try {
       const conn = await api<ConnectionResponse>("/ga/connection", {}, { accessToken: token });
       setConnection(conn.connection);
-      const rec = await api<LatestRecommendationsResponse>(
-        "/recommendations/latest",
-        {},
-        { accessToken: token }
-      );
-      setRecommendations(rec);
+      await loadSnapshot(conn.connection);
     } catch (e) {
       const err = e as ApiFetchError;
       if (err.status === 404) {
         setNoConnection(true);
         setConnection(null);
-        setRecommendations(null);
+        setSnapshot(null);
       } else {
         setError(err.message || "Failed to load dashboard");
       }
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, loadSnapshot]);
 
   useEffect(() => {
     if (status === "authenticated" && token) void load();
     if (status === "unauthenticated") setLoading(false);
   }, [status, token, load]);
 
-  async function handleSync() {
+  async function handleFetchGa() {
     if (!token || !connection?.id) return;
     setSyncing(true);
     setError(null);
     try {
-      const result = await api<LatestRecommendationsResponse>(
-        `/sync/${connection.id}`,
+      const result = await api<LatestSnapshotResponse>(
+        `/sync/${connection.id}/ga`,
         { method: "POST" },
         { accessToken: token }
       );
-      setRecommendations(result);
+      setSnapshot(result);
+      setNoSnapshot(false);
     } catch (e) {
       const err = e as ApiFetchError;
-      setError(err.message || "Analysis failed");
+      setError(formatSyncError(err.message || "Failed to fetch GA data"));
     } finally {
       setSyncing(false);
     }
@@ -117,7 +130,7 @@ export default function DashboardView() {
   if (noConnection) {
     return (
       <DashboardShell>
-        <p className="text-sm text-zinc-600">Connect a GA4 property to see health score and issues.</p>
+        <p className="text-sm text-zinc-600">Connect a GA4 property to view analytics data.</p>
         <Link
           href="/select-property"
           className="inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
@@ -127,10 +140,6 @@ export default function DashboardView() {
       </DashboardShell>
     );
   }
-
-  const healthScore = recommendations?.recommendation.healthScore ?? null;
-  const issues = recommendations?.recommendation.issues ?? [];
-  const isMock = recommendations?.mock === true;
 
   return (
     <div className="space-y-8">
@@ -144,35 +153,46 @@ export default function DashboardView() {
               <span className="font-medium text-zinc-800">{connection.propertyName}</span>
             </p>
           ) : null}
+          {snapshot ? (
+            <p className="text-xs text-zinc-400">
+              Data: {snapshot.snapshot.dateRangeStart} – {snapshot.snapshot.dateRangeEnd}
+              {snapshot.snapshot.fetchedAt
+                ? ` · Fetched ${new Date(snapshot.snapshot.fetchedAt).toLocaleString()}`
+                : null}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
           disabled={syncing || !connection}
-          onClick={() => void handleSync()}
+          onClick={() => void handleFetchGa()}
           className="shrink-0 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {syncing ? "Running analysis…" : "Run analysis"}
+          {syncing ? "Fetching…" : "Fetch GA data"}
         </button>
       </div>
 
       <ErrorMessage message={error} onRetry={() => void load()} />
 
-      {isMock ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-          Showing sample data — click Run analysis for live GA4 insights (requires{" "}
-          <code className="text-xs">ANTHROPIC_API_KEY</code> on the backend).
+      {noSnapshot && !syncing ? (
+        <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+          No GA data yet. Click <strong>Fetch GA data</strong> to pull the last 30 days from
+          Google Analytics.
         </p>
       ) : null}
 
-      {recommendations?.recommendation.summary ? (
-        <p className="text-sm text-zinc-600">{recommendations.recommendation.summary}</p>
+      {snapshot ? (
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium">GA4 metrics (last 30 days)</h2>
+          <p className="text-sm text-zinc-500">
+            {snapshot.rowCount} row{snapshot.rowCount === 1 ? "" : "s"} · sorted by sessions
+          </p>
+          <GaMetricsTable columns={snapshot.columns} rows={snapshot.rows} />
+        </section>
       ) : null}
 
-      <HealthScore score={healthScore} />
-
-      <section>
-        <h2 className="mb-3 text-lg font-medium">Top issues</h2>
-        <IssueList issues={mapIssuesToList(issues)} />
+      <section className="rounded-lg border border-dashed border-zinc-200 px-4 py-3 text-sm text-zinc-500">
+        AI health score and recommendations — coming soon.
       </section>
     </div>
   );

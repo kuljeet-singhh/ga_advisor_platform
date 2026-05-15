@@ -1,11 +1,30 @@
 import { getConnectionByIdForUser } from "./connection.service.js";
 import { resolveAccessTokenForSync } from "./token.service.js";
 import { fetchAndStoreSnapshot } from "./snapshot.service.js";
+import { formatSnapshotApiPayload } from "../utils/gaReportParser.js";
 import { analyseSnapshot } from "./claude.service.js";
 import {
   insertRecommendation,
   formatRecommendationResponse,
 } from "./recommendation.service.js";
+
+export async function runGaSyncForConnection({ connectionId, userId, bearerAccessToken }) {
+  const connection = await getConnectionByIdForUser(connectionId, userId);
+  if (!connection) {
+    const err = new Error("Connection not found");
+    err.status = 404;
+    throw err;
+  }
+
+  const accessToken = resolveAccessTokenForSync(connection, bearerAccessToken);
+  const snapshot = await fetchAndStoreSnapshot({
+    connectionId: connection.id,
+    propertyId: connection.property_id,
+    accessToken,
+  });
+
+  return formatSnapshotApiPayload(snapshot);
+}
 
 export async function runSyncForConnection({ connectionId, userId, bearerAccessToken }) {
   const connection = await getConnectionByIdForUser(connectionId, userId);

@@ -6,10 +6,22 @@ import { ensureDbUser } from "../middleware/dbUser.middleware.js";
 const router = Router();
 
 router.post(
+  "/sync/:connectionId/ga",
+  requireAuth,
+  ensureDbUser,
+  analyseController.gaSyncConnection
+);
+router.post(
   "/sync/:connectionId",
   requireAuth,
   ensureDbUser,
   analyseController.syncConnection
+);
+router.get(
+  "/snapshots/latest",
+  requireAuth,
+  ensureDbUser,
+  analyseController.latestSnapshot
 );
 router.get(
   "/recommendations/latest",

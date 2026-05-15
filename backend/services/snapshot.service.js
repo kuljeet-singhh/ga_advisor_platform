@@ -1,5 +1,7 @@
 import { query } from "../config/db.js";
 import { runGa4Report } from "./ga.service.js";
+import { formatSnapshotApiPayload } from "../utils/gaReportParser.js";
+import { getConnectionByUserId } from "./connection.service.js";
 
 function getDateRange() {
   const end = new Date();
@@ -22,4 +24,26 @@ export async function fetchAndStoreSnapshot({ connectionId, propertyId, accessTo
     [connectionId, JSON.stringify(gaData), startDate, endDate]
   );
   return { ...result.rows[0], data: gaData };
+}
+
+export async function getLatestSnapshotForConnection(connectionId) {
+  const result = await query(
+    `SELECT id, connection_id, data, fetched_at, date_range_start, date_range_end
+     FROM ga_snapshots
+     WHERE connection_id = $1
+     ORDER BY fetched_at DESC
+     LIMIT 1`,
+    [connectionId]
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function getLatestSnapshotPayloadForUser(userId) {
+  const connection = await getConnectionByUserId(userId);
+  if (!connection) return null;
+
+  const snapshot = await getLatestSnapshotForConnection(connection.id);
+  if (!snapshot) return null;
+
+  return formatSnapshotApiPayload(snapshot);
 }
