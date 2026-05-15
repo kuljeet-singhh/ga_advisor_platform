@@ -22,7 +22,7 @@ export default function Home() {
           >
             Go to dashboard
           </Link>{" "}
-          if you are already signed in.
+          if you are already signed.
         </p>
       </div>
     </div>
