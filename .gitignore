@@ -1,0 +1,28 @@
+# Secrets and local env (repo root + packages)
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# Dependencies and build output
+node_modules/
+**/.next/
+**/out/
+**/dist/
+**/.turbo/
+
+# OS / logs
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Task specs and task indexes (local only)
+**/tasks/
+**/TASKS.md
+
+# Cursor rules (local / team IDE only)
+.cursor/rules/
+
+# Full project PDF (local reference; do not publish)
+GA_Advisor_Platform_Full_Project.pdf
