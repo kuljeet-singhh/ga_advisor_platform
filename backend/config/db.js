@@ -20,6 +20,16 @@ export function getConnectionString() {
 
 let pool;
 
+function getPoolMaxConnections() {
+  const raw = process.env.DATABASE_POOL_MAX;
+  if (raw !== undefined && raw !== "") {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 1) return Math.min(Math.floor(n), 100);
+  }
+  if (process.env.VERCEL === "1") return 2;
+  return 10;
+}
+
 export function getPool() {
   if (!process.env.DATABASE_URL) {
     return null;
@@ -27,7 +37,7 @@ export function getPool() {
   if (!pool) {
     pool = new pg.Pool({
       connectionString: getConnectionString(),
-      max: 10,
+      max: getPoolMaxConnections(),
       idleTimeoutMillis: 30_000,
     });
   }
