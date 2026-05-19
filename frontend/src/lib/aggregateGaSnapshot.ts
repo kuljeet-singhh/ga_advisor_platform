@@ -14,7 +14,25 @@ export type DashboardKpis = {
 
 export type ChannelSessions = { channel: string; sessions: number };
 export type ChannelDuration = { channel: string; duration: number };
-export type PageSessionsViews = { page: string; sessions: number; pageViews: number };
+export type PageSessionsViews = {
+  page: string;
+  pageFull: string;
+  sessions: number;
+  pageViews: number;
+};
+
+export function formatChartPageLabel(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed || trimmed === "/" || trimmed === "(not set)") {
+    return "Home";
+  }
+  let label = trimmed.startsWith("/") ? trimmed.slice(1) : trimmed;
+  if (!label) return "Home";
+  if (label.length > 28) {
+    label = `${label.slice(0, 26)}…`;
+  }
+  return label;
+}
 export type UsersBreakdown = { newUsers: number; returningUsers: number };
 
 export type DashboardAggregates = {
@@ -118,10 +136,11 @@ export function aggregateGaSnapshot(snapshot: LatestSnapshotResponse | null): Da
   const pageSessions = groupSum(rows, pageField, "sessions");
   const pageViewsMap = groupSum(rows, pageField, "screenPageViews");
   const sessionsVsPageViews = [...pageSessions.entries()]
-    .map(([page, sessions]) => ({
-      page: page.length > 28 ? `${page.slice(0, 26)}…` : page,
+    .map(([pageFull, sessions]) => ({
+      pageFull,
+      page: formatChartPageLabel(pageFull),
       sessions,
-      pageViews: pageViewsMap.get(page) ?? 0,
+      pageViews: pageViewsMap.get(pageFull) ?? 0,
     }))
     .sort((a, b) => b.sessions - a.sessions)
     .slice(0, 8);

@@ -16,10 +16,11 @@ export async function runGaSyncForConnection({ connectionId, userId, bearerAcces
     throw err;
   }
 
-  const accessToken = resolveAccessTokenForSync(connection, bearerAccessToken);
+  const accessToken = await resolveAccessTokenForSync(connection, bearerAccessToken);
   const snapshot = await fetchAndStoreSnapshot({
     connectionId: connection.id,
     propertyId: connection.property_id,
+    connection,
     accessToken,
   });
 
@@ -34,10 +35,11 @@ export async function runSyncForConnection({ connectionId, userId, bearerAccessT
     throw err;
   }
 
-  const accessToken = resolveAccessTokenForSync(connection, bearerAccessToken);
+  const accessToken = await resolveAccessTokenForSync(connection, bearerAccessToken);
   const snapshot = await fetchAndStoreSnapshot({
     connectionId: connection.id,
     propertyId: connection.property_id,
+    connection,
     accessToken,
   });
 

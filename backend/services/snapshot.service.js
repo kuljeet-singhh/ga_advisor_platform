@@ -1,5 +1,5 @@
 import { query } from "../config/db.js";
-import { runGa4Report } from "./ga.service.js";
+import { runGa4Report, runGa4ReportForConnection } from "./ga.service.js";
 import { formatSnapshotApiPayload } from "../utils/gaReportParser.js";
 import { getConnectionByUserId } from "./connection.service.js";
 
@@ -13,8 +13,10 @@ function getDateRange() {
   };
 }
 
-export async function fetchAndStoreSnapshot({ connectionId, propertyId, accessToken }) {
-  const gaData = await runGa4Report(propertyId, accessToken);
+export async function fetchAndStoreSnapshot({ connectionId, propertyId, connection, accessToken }) {
+  const gaData = connection?.refresh_token_encrypted
+    ? await runGa4ReportForConnection(propertyId, connection)
+    : await runGa4Report(propertyId, accessToken);
   const { startDate, endDate } = getDateRange();
 
   const result = await query(

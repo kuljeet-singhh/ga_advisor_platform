@@ -1,3 +1,5 @@
+import { gaFetchWithConnection } from "./ga-fetch.js";
+
 const ADMIN_BASE = "https://analyticsadmin.googleapis.com/v1beta";
 const DATA_BASE = "https://analyticsdata.googleapis.com/v1beta";
 
@@ -22,6 +24,18 @@ const RUN_REPORT_BODY = {
   limit: 25,
 };
 
+async function parseGaResponse(res, errorLabel) {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data.error?.message || data.message || res.statusText || errorLabel;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.details = data;
+    throw err;
+  }
+  return data;
+}
+
 export async function listGa4PropertiesForPicker(accessToken) {
   const headers = { Authorization: `Bearer ${accessToken}` };
   const out = [];
@@ -32,15 +46,7 @@ export async function listGa4PropertiesForPicker(accessToken) {
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
     const res = await fetch(url, { headers });
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      const msg = data.error?.message || data.message || res.statusText || "admin_api_error";
-      const err = new Error(msg);
-      err.status = res.status;
-      err.details = data;
-      throw err;
-    }
+    const data = await parseGaResponse(res, "admin_api_error");
 
     const summaries = data.accountSummaries || [];
     for (const sum of summaries) {
@@ -76,13 +82,19 @@ export async function runGa4Report(propertyId, accessToken) {
     },
     body: JSON.stringify(RUN_REPORT_BODY),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = data.error?.message || data.message || res.statusText || "ga_data_api_error";
-    const err = new Error(msg);
-    err.status = res.status;
-    err.details = data;
-    throw err;
-  }
-  return data;
+  return parseGaResponse(res, "ga_data_api_error");
+}
+
+export async function runGa4ReportForConnection(propertyId, connection) {
+  const url = `${DATA_BASE}/properties/${propertyId}:runReport`;
+  const res = await gaFetchWithConnection(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(RUN_REPORT_BODY),
+    },
+    connection
+  );
+  return parseGaResponse(res, "ga_data_api_error");
 }

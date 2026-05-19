@@ -93,11 +93,22 @@ export default function DashboardCharts({ data }: DashboardChartsProps) {
           <EmptyChart />
         ) : (
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data.sessionsVsPageViews} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <BarChart data={data.sessionsVsPageViews} margin={{ top: 4, right: 8, left: 0, bottom: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="page" tick={{ fontSize: 10 }} tickLine={false} interval={0} angle={-20} textAnchor="end" height={50} />
+              <XAxis
+                dataKey="page"
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                interval={0}
+                textAnchor="middle"
+                height={36}
+              />
               <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <Tooltip />
+              <Tooltip
+                labelFormatter={(_, payload) =>
+                  String(payload?.[0]?.payload?.pageFull ?? "")
+                }
+              />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="sessions" fill="#3b82f6" name="Sessions" radius={[4, 4, 0, 0]} />
               <Bar dataKey="pageViews" fill="#22c55e" name="Page views" radius={[4, 4, 0, 0]} />

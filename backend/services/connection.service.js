@@ -39,6 +39,30 @@ export async function getConnectionByUserId(userId) {
   return result.rows[0] ?? null;
 }
 
+export async function updateConnectionTokens(
+  connectionId,
+  { accessTokenPlain, refreshTokenPlain, accessTokenExpiresAtMs }
+) {
+  const accessEnc = encryptSecret(accessTokenPlain);
+  const refreshEnc = refreshTokenPlain ? encryptSecret(refreshTokenPlain) : null;
+  const expiresAt = new Date(defaultAccessTokenExpiryMs(accessTokenExpiresAtMs));
+
+  const result = await query(
+    `UPDATE ga_connections SET
+       access_token_encrypted = $2,
+       refresh_token_encrypted = COALESCE($3, refresh_token_encrypted),
+       token_expires_at = $4
+     WHERE id = $1
+     RETURNING id, user_id, property_id, property_name, access_token_encrypted, refresh_token_encrypted,
+               token_expires_at, connected_at`,
+    [connectionId, accessEnc, refreshEnc, expiresAt]
+  );
+  if (!result.rows[0]) {
+    throw new Error("Connection not found");
+  }
+  return result.rows[0];
+}
+
 export async function getConnectionByIdForUser(connectionId, userId) {
   const result = await query(
     `SELECT id, user_id, property_id, property_name, access_token_encrypted, refresh_token_encrypted,

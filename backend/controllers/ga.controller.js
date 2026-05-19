@@ -36,19 +36,21 @@ export async function saveConnection(req, res, next) {
     if (!token) {
       return res.status(401).json({ error: "Google access token required" });
     }
-    const { propertyId, propertyName, accessTokenExpiresAtMs } = req.body || {};
+    const { propertyId, propertyName, accessTokenExpiresAtMs, refreshToken } = req.body || {};
     if (!propertyId || typeof propertyId !== "string") {
       return res.status(400).json({ error: "propertyId is required" });
     }
     const name =
       typeof propertyName === "string" && propertyName.trim() ? propertyName.trim() : propertyId;
+    const refreshPlain =
+      typeof refreshToken === "string" && refreshToken.trim() ? refreshToken.trim() : null;
 
     const row = await upsertConnectionForUser({
       userId: req.dbUserId,
       propertyId: propertyId.trim(),
       propertyName: name,
       accessTokenPlain: token,
-      refreshTokenPlain: null,
+      refreshTokenPlain: refreshPlain,
       accessTokenExpiresAtMs,
     });
 

@@ -73,17 +73,25 @@ export default function SelectPropertyPage() {
     try {
       setSaving(true);
       setError(null);
-      await api(
-        "/ga/connections",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            propertyId: selectedId,
-            propertyName: row?.displayName ?? row?.name ?? selectedId,
-          }),
-        },
-        { accessToken: token }
-      );
+      const res = await fetch("/api/ga/connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          propertyId: selectedId,
+          propertyName: row?.displayName ?? row?.name ?? selectedId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message =
+          typeof data === "object" &&
+          data !== null &&
+          "error" in data &&
+          typeof (data as { error: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : "Save failed";
+        throw new Error(message);
+      }
       router.push("/dashboard");
     } catch (e) {
       setError(formatApiError(e, "Save failed"));
