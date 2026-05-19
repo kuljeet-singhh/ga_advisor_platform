@@ -1,23 +1,56 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
-import BackendAuthStatus from "@/components/BackendAuthStatus";
+import MetaInfoPills from "@/components/MetaInfoPills";
+import DashboardKpiGrid from "@/components/DashboardKpiGrid";
+import DashboardCharts from "@/components/DashboardCharts";
 import GaMetricsTable from "@/components/GaMetricsTable";
+import AiInsightsFooter from "@/components/AiInsightsFooter";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorMessage from "@/components/ErrorMessage";
 import { api, type ApiFetchError } from "@/lib/api";
+import { aggregateGaSnapshot } from "@/lib/aggregateGaSnapshot";
 import type { ConnectionResponse } from "@/types/recommendations";
 import type { LatestSnapshotResponse } from "@/types/snapshots";
 
 function DashboardShell({ children }: { children: ReactNode }) {
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <BackendAuthStatus />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Dashboard</h1>
+        <p className="mt-1 text-sm text-slate-500">GA4 metrics · last 30 days</p>
+      </div>
       {children}
     </div>
+  );
+}
+
+function FetchButton({ syncing, disabled, onClick }: { syncing: boolean; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled || syncing}
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+    >
+      <svg
+        className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        aria-hidden
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+        />
+      </svg>
+      {syncing ? "Fetching…" : "Fetch GA data"}
+    </button>
   );
 }
 
@@ -40,28 +73,23 @@ export default function DashboardView() {
   const [noConnection, setNoConnection] = useState(false);
   const [noSnapshot, setNoSnapshot] = useState(false);
 
-  const loadSnapshot = useCallback(
-    async (conn: ConnectionResponse["connection"]) => {
-      try {
-        const snap = await api<LatestSnapshotResponse>(
-          "/snapshots/latest",
-          {},
-          { accessToken: token }
-        );
-        setSnapshot(snap);
-        setNoSnapshot(false);
-      } catch (e) {
-        const err = e as ApiFetchError;
-        if (err.status === 404) {
-          setSnapshot(null);
-          setNoSnapshot(true);
-        } else {
-          throw e;
-        }
+  const aggregates = useMemo(() => aggregateGaSnapshot(snapshot), [snapshot]);
+
+  const loadSnapshot = useCallback(async () => {
+    try {
+      const snap = await api<LatestSnapshotResponse>("/snapshots/latest", {}, { accessToken: token });
+      setSnapshot(snap);
+      setNoSnapshot(false);
+    } catch (e) {
+      const err = e as ApiFetchError;
+      if (err.status === 404) {
+        setSnapshot(null);
+        setNoSnapshot(true);
+      } else {
+        throw e;
       }
-    },
-    [token]
-  );
+    }
+  }, [token]);
 
   const load = useCallback(async () => {
     if (!token) {
@@ -75,7 +103,7 @@ export default function DashboardView() {
     try {
       const conn = await api<ConnectionResponse>("/ga/connection", {}, { accessToken: token });
       setConnection(conn.connection);
-      await loadSnapshot(conn.connection);
+      await loadSnapshot();
     } catch (e) {
       const err = e as ApiFetchError;
       if (err.status === 404) {
@@ -122,7 +150,7 @@ export default function DashboardView() {
   if (status !== "authenticated" || !token) {
     return (
       <DashboardShell>
-        <p className="text-sm text-zinc-600">Sign in with Google to view your dashboard.</p>
+        <p className="text-sm text-slate-600">Sign in with Google to view your dashboard.</p>
       </DashboardShell>
     );
   }
@@ -130,10 +158,10 @@ export default function DashboardView() {
   if (noConnection) {
     return (
       <DashboardShell>
-        <p className="text-sm text-zinc-600">Connect a GA4 property to view analytics data.</p>
+        <p className="text-sm text-slate-600">Connect a GA4 property to view analytics data.</p>
         <Link
           href="/select-property"
-          className="inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+          className="inline-block rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
         >
           Select property
         </Link>
@@ -141,59 +169,59 @@ export default function DashboardView() {
     );
   }
 
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <BackendAuthStatus />
-          {connection ? (
-            <p className="text-sm text-zinc-500">
-              Property:{" "}
-              <span className="font-medium text-zinc-800">{connection.propertyName}</span>
-            </p>
-          ) : null}
-          {snapshot ? (
-            <p className="text-xs text-zinc-400">
-              Data: {snapshot.snapshot.dateRangeStart} – {snapshot.snapshot.dateRangeEnd}
-              {snapshot.snapshot.fetchedAt
-                ? ` · Fetched ${new Date(snapshot.snapshot.fetchedAt).toLocaleString()}`
-                : null}
-            </p>
-          ) : null}
+  const headerBlock = (
+    <>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Dashboard</h1>
+          <p className="mt-1 text-sm text-slate-500">GA4 metrics · last 30 days</p>
         </div>
-        <button
-          type="button"
-          disabled={syncing || !connection}
+        <FetchButton
+          syncing={syncing}
+          disabled={!connection}
           onClick={() => void handleFetchGa()}
-          className="shrink-0 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {syncing ? "Fetching…" : "Fetch GA data"}
-        </button>
+        />
       </div>
+      <MetaInfoPills
+        email={session.user?.email}
+        propertyName={connection?.propertyName}
+        dateRangeStart={snapshot?.snapshot.dateRangeStart}
+        dateRangeEnd={snapshot?.snapshot.dateRangeEnd}
+        fetchedAt={snapshot?.snapshot.fetchedAt}
+      />
+    </>
+  );
+
+  return (
+    <div className="space-y-6">
+      {headerBlock}
 
       <ErrorMessage message={error} onRetry={() => void load()} />
 
       {noSnapshot && !syncing ? (
-        <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-          No GA data yet. Click <strong>Fetch GA data</strong> to pull the last 30 days from
-          Google Analytics.
-        </p>
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-600 shadow-sm">
+          No GA data yet. Click <strong>Fetch GA data</strong> to pull the last 30 days from Google
+          Analytics.
+        </div>
       ) : null}
 
-      {snapshot ? (
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">GA4 metrics (last 30 days)</h2>
-          <p className="text-sm text-zinc-500">
-            {snapshot.rowCount} row{snapshot.rowCount === 1 ? "" : "s"} · sorted by sessions
-          </p>
-          <GaMetricsTable columns={snapshot.columns} rows={snapshot.rows} />
-        </section>
+      {snapshot && snapshot.rowCount > 0 ? (
+        <>
+          <DashboardKpiGrid kpis={aggregates.kpis} />
+          <DashboardCharts data={aggregates} />
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-medium text-slate-900">Page breakdown</h2>
+              <p className="text-sm text-slate-500">
+                {snapshot.rowCount} row{snapshot.rowCount === 1 ? "" : "s"} · sorted by sessions
+              </p>
+            </div>
+            <GaMetricsTable columns={snapshot.columns} rows={snapshot.rows} />
+          </section>
+        </>
       ) : null}
 
-      <section className="rounded-lg border border-dashed border-zinc-200 px-4 py-3 text-sm text-zinc-500">
-        AI health score and recommendations — coming soon.
-      </section>
+      <AiInsightsFooter />
     </div>
   );
 }

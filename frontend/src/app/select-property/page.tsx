@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
-import PropertySelector, { type GaPropertyOption } from "@/components/PropertySelector";
+import SelectPropertyView from "@/components/select-property/SelectPropertyView";
+import type { GaPropertyOption } from "@/components/PropertySelector";
 import { api, type ApiFetchError } from "@/lib/api";
+import type { ConnectionResponse } from "@/types/recommendations";
 
 function formatApiError(e: unknown, fallback: string): string {
   if (e instanceof Error && "status" in e) {
@@ -21,6 +23,7 @@ export default function SelectPropertyPage() {
   const { data: session, status } = useSession();
   const token = session?.googleAccessToken;
   const [properties, setProperties] = useState<GaPropertyOption[]>([]);
+  const [defaultPropertyId, setDefaultPropertyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | undefined>();
@@ -34,12 +37,23 @@ export default function SelectPropertyPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api<{ properties: GaPropertyOption[] }>(
-        "/ga/properties",
-        {},
-        { accessToken: token }
-      );
-      setProperties(data.properties ?? []);
+      const [propsRes, connRes] = await Promise.all([
+        api<{ properties: GaPropertyOption[] }>("/ga/properties", {}, { accessToken: token }),
+        api<ConnectionResponse>("/ga/connection", {}, { accessToken: token }).catch((e) => {
+          const err = e as ApiFetchError;
+          if (err.status === 404) return null;
+          throw e;
+        }),
+      ]);
+      const list = propsRes.properties ?? [];
+      setProperties(list);
+      const savedId = connRes?.connection?.propertyId ?? null;
+      setDefaultPropertyId(savedId);
+      if (savedId && list.some((p) => (p.id ?? p.propertyId) === savedId)) {
+        setSelectedId(savedId);
+      } else if (list.length > 0) {
+        setSelectedId(list[0].id ?? list[0].propertyId);
+      }
     } catch (e) {
       setError(formatApiError(e, "Failed to load properties"));
       setProperties([]);
@@ -78,47 +92,45 @@ export default function SelectPropertyPage() {
     }
   }
 
+  function handleBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/dashboard");
+    }
+  }
+
   if (status === "loading") {
-    return <p className="text-sm text-zinc-600">Loading session…</p>;
+    return (
+      <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <p className="text-center text-sm text-slate-600">Loading session…</p>
+      </div>
+    );
   }
 
   if (status !== "authenticated" || !token) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Select GA4 property</h1>
-        <p className="text-sm text-zinc-600">Sign in with Google (header) to list your properties.</p>
+      <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <h1 className="text-2xl font-semibold text-slate-900">Select GA4 property</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Sign in with Google (header) to list your properties.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Select GA4 property</h1>
-      <p className="text-sm text-zinc-600">
-        Choose the property to analyze (MVP: one property per account). Data loads from the
-        backend.
-      </p>
-      {loading ? <p className="text-sm text-zinc-500">Loading properties…</p> : null}
-      {error ? (
-        <p className="text-sm text-red-600" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <PropertySelector
-        properties={properties}
-        selectedId={selectedId}
-        onSelect={(id) => setSelectedId(id)}
-      />
-      <div className="flex gap-3 pt-2">
-        <button
-          type="button"
-          disabled={!selectedId || saving || loading}
-          onClick={() => void handleSave()}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save property"}
-        </button>
-      </div>
-    </div>
+    <SelectPropertyView
+      properties={properties}
+      selectedId={selectedId}
+      defaultPropertyId={defaultPropertyId}
+      loading={loading}
+      saving={saving}
+      error={error}
+      onSelect={setSelectedId}
+      onSave={() => void handleSave()}
+      onBack={handleBack}
+      onRetry={() => void load()}
+    />
   );
 }
