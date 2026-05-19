@@ -2,7 +2,7 @@ import { getConnectionByIdForUser } from "./connection.service.js";
 import { resolveAccessTokenForSync } from "./token.service.js";
 import { fetchAndStoreSnapshot } from "./snapshot.service.js";
 import { formatSnapshotApiPayload } from "../utils/gaReportParser.js";
-import { analyseSnapshot } from "./claude.service.js";
+import { analyseSnapshot } from "./llm.service.js";
 import {
   insertRecommendation,
   formatRecommendationResponse,
