@@ -56,3 +56,6 @@ export async function query(text, params) {
   if (!p) throw new Error("DATABASE_URL is not configured");
   return p.query(text, params);
 }
+
+
+
