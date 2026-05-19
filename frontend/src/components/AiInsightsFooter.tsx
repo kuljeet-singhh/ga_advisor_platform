@@ -17,8 +17,10 @@ export default function AiInsightsFooter() {
         <div>
           <h3 className="font-medium text-slate-900">AI health score and recommendations</h3>
           <p className="mt-1 text-sm text-slate-600">
-            Run Claude analysis on your GA snapshot for actionable insights. Requires{" "}
-            <code className="text-xs">ANTHROPIC_API_KEY</code> on the backend.
+            Run AI analysis on your GA snapshot for actionable insights. Set{" "}
+            <code className="text-xs">GEMINI_API_KEY</code> or{" "}
+            <code className="text-xs">ANTHROPIC_API_KEY</code> on the backend (see{" "}
+            <code className="text-xs">LLM_PROVIDER</code>).
           </p>
         </div>
       </div>

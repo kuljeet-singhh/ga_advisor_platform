@@ -3,6 +3,7 @@ import {
   getLatestRecommendationForConnection,
   getMockRecommendationPayload,
   formatRecommendationResponse,
+  shouldUseMockRecommendations,
 } from "../services/recommendation.service.js";
 import {
   runSyncForConnection,
@@ -22,7 +23,11 @@ export async function latestRecommendations(req, res, next) {
       return res.json(formatRecommendationResponse(row));
     }
 
-    return res.json(getMockRecommendationPayload());
+    if (shouldUseMockRecommendations()) {
+      return res.json(getMockRecommendationPayload());
+    }
+
+    return res.status(404).json({ error: "No analysis yet. Run analysis first." });
   } catch (e) {
     next(e);
   }

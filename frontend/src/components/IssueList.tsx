@@ -6,6 +6,7 @@ export type IssueItem = {
   metric?: string;
   impact?: string;
   body?: ReactNode;
+  href?: string;
 };
 
 type IssueListProps = { issues?: IssueItem[] };
@@ -14,7 +15,7 @@ export default function IssueList({ issues = [] }: IssueListProps) {
   if (!issues.length) {
     return (
       <p className="text-sm text-zinc-500">
-        No issues yet. Run a sync from the backend when data is available.
+        No issues yet. Run analysis to generate recommendations.
       </p>
     );
   }
@@ -27,6 +28,7 @@ export default function IssueList({ issues = [] }: IssueListProps) {
             title={issue.title ?? `Issue ${i + 1}`}
             metric={issue.metric}
             impact={issue.impact}
+            href={issue.href}
           >
             {issue.body}
           </IssueCard>
